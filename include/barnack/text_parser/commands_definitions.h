@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <string>
 #include <limits>
@@ -35,7 +35,7 @@ namespace barnack::text_parser::command_definition
 		output_body_base(output_string_t& output_string) : output_string{output_string} {}
 		output_string_t& output_string;
 
-		virtual void on_child(const typename tree_parser<char_t>::command& command, const typename tokeniser  <char_t>::range& child_range) final override
+		virtual void on_child(const typename tree_parser<char_t>::command& command, const typename tokeniser<char_t>::range& child_range) final override
 			{
 			output_string += utils::string::cast<output_char_t>(child_range.string());
 			}
@@ -241,19 +241,19 @@ namespace barnack::text_parser::command_definition
 			std::basic_string<char_t> generate_string(const typename tree_parser<char_t>::command& command) const noexcept
 				{
 				std::basic_string<char_t> ret;
-
+				
 				utils::observer_ptr<const char_t> it{replacement_string_prototype.data()};
-
+				
 				for (size_t i{0}; i < replacement_parameters_ranges.size(); i++)
 					{
 					const auto& replacement_parameter_range{replacement_parameters_ranges[i]};
-
-					ret += std::string_view{it, replacement_string_prototype.data() + replacement_parameter_range.index_begin};
+				
+					ret += std::basic_string_view<char_t>{it, replacement_string_prototype.data() + replacement_parameter_range.index_begin};
 					ret += command.parameters[replacement_parameter_range.parameter_index].string();
 					it = replacement_string_prototype.data() + replacement_parameter_range.index_end;
 					}
-				ret += std::string_view{it, replacement_string_prototype.data() + replacement_string_prototype.size()};
-
+				ret += std::basic_string_view<char_t>{it, replacement_string_prototype.data() + replacement_string_prototype.size()};
+				
 				return ret;
 				}
 				
@@ -272,15 +272,15 @@ namespace barnack::text_parser::command_definition
 				{
 				tokeniser<char_t> tokeniser{replacement_string_prototype};
 				auto it{tokeniser.begin_with_info()};
-
+				
 				while (it.it != tokeniser.end())
 					{
 					const auto codepoint_with_range{tokeniser.next_codepoint(it)};
-
+				
 					if (codepoint_with_range.codepoint == U'\\')
 						{
 						const auto second_codepoint_with_range{tokeniser.next_codepoint(codepoint_with_range.range.end)};
-
+				
 						if (second_codepoint_with_range.codepoint == U'#')
 							{
 							const auto number_range{tokeniser.next_number(second_codepoint_with_range.range.end)};
@@ -293,13 +293,13 @@ namespace barnack::text_parser::command_definition
 							else
 								{
 								// Causes internal compiler error, converting to std::stringstream instead
-								std::basic_stringstream<char_t> parameter_index_stringstream{std::basic_string<char_t>{number_range.string()}};
-
+								std::stringstream parameter_index_stringstream{utils::string::cast<char>(number_range.string())};
+				
 								//std::string numbers_range_as_string{string::cast<char, char_t>(number_range.string())};
 								//std::stringstream parameter_index_stringstream{numbers_range_as_string};
 								size_t parameter_index{0};
 								parameter_index_stringstream >> parameter_index;
-
+				
 								replacement_string_parameters_count = std::max(replacement_string_parameters_count, parameter_index + 1);
 								replacement_parameters_ranges.push_back(replacement_parameters_range_t
 									{
@@ -310,7 +310,7 @@ namespace barnack::text_parser::command_definition
 								}
 							}
 						}
-
+				
 					it = codepoint_with_range.range.end;
 					}
 				}
@@ -406,18 +406,18 @@ namespace barnack::text_parser::command_definition
 					{
 					const auto generated_string_before_body{replacement_piece_before_body.generate_string(command)};
 					const auto generated_string_after_body {replacement_piece_after_body .generate_string(command)};
-
+					
 					tokeniser<char_t> tokeniser_before_body{generated_string_before_body};
 					tokeniser<char_t> tokeniser_after_body {generated_string_after_body };
 						
 					tree_parser<char_t> parser;
 					parser.parse_all(tokeniser_before_body);
-
+					
 					auto& top_sequence{*parser.sequences_stack.top()};
 					top_sequence.insert(top_sequence.end(), command.children.begin(), command.children.end());
-
+					
 					parser.parse_all(tokeniser_after_body);
-
+					
 					commands_executor<char_t>& commands_executor{*commands_executor_ptr};
 					commands_executor.execute(parser.root);
 					}
@@ -432,7 +432,7 @@ namespace barnack::text_parser::command_definition
 
 
 	template <typename CHAR_T, typename OUTPUT_CHAR_T, typename REGIONS_VALUE_TYPE>
-	struct region_properties : output_body_base<char8_t, char16_t>
+	struct region_properties : output_body_base<CHAR_T, OUTPUT_CHAR_T>
 		{
 		using char_t          = typename output_body_base<CHAR_T, OUTPUT_CHAR_T>::char_t;
 		using output_char_t   = typename output_body_base<CHAR_T, OUTPUT_CHAR_T>::output_char_t;
@@ -440,6 +440,8 @@ namespace barnack::text_parser::command_definition
 
 		using regions_value_type = REGIONS_VALUE_TYPE;
 		using regions_t = utils::containers::regions<regions_value_type>;
+
+		using output_body_base<CHAR_T, OUTPUT_CHAR_T>::output_string;
 
 		region_properties(output_string_t& output_string, regions_t& output_region) :
 			output_body_base<CHAR_T, OUTPUT_CHAR_T>{output_string},
@@ -453,7 +455,7 @@ namespace barnack::text_parser::command_definition
 	
 		virtual void on_begin(const typename tree_parser<char_t>::command& command) final override
 			{
-			const auto last_slot = output_region.at_slot_index(output_string.size());
+			const auto last_slot = output_region.at_element_index(output_string.size());
 			previous_value = last_slot.value();
 	
 			output_region.add(region_value(command), utils::containers::region::create::from(output_string.size()));
@@ -462,6 +464,59 @@ namespace barnack::text_parser::command_definition
 		virtual void on_end(const typename tree_parser<char_t>::command& command) final override
 			{
 			output_region.add(previous_value, utils::containers::region::create::from(output_string.size()));
+			}
+		};
+
+
+
+
+
+
+
+	template <typename CHAR_T, typename OUTPUT_CHAR_T>
+	struct unicode_codepoint : base<CHAR_T>
+		{
+		using char_t = typename base<CHAR_T>::char_t;
+		using output_char_t = OUTPUT_CHAR_T;
+		using output_string_t = std::basic_string<output_char_t>;
+
+		unicode_codepoint(output_string_t& output_string) : output_string{output_string} {}
+		output_string_t& output_string;
+
+		virtual std::basic_string_view<char_t> name() const noexcept final override
+			{
+			static std::basic_string<char_t> ret{utils::string::cast<char_t>("unicode_codepoint")}; //TODO constexpr once utf8 library becomes constexpr, if ever
+			return ret;
+			}
+
+		virtual void on_begin(const typename tree_parser<char_t>::command& command) final override
+			{
+			const auto& parameter{command.parameters[0]};
+			const std::basic_string_view<char_t> hex_number_string{parameter.begin.it + 1/*skip starting 'c'*/, parameter.end.it};
+			const char32_t codepoint{utils::string::parse_codepoint(hex_number_string)};
+			const std::basic_string<output_char_t> codepoint_as_string{utils::string::codepoint_to_string<output_char_t>(codepoint)};
+			
+			output_string += codepoint_as_string;
+			}
+
+		virtual void validate(const typename tree_parser<char_t>::command& command) const override
+			{
+			const std::runtime_error error{"Error parsing \"unicode_codepoint\" command\n"
+					"Expects an unicode escape sequence (without prior backslash) as parameter and expects no body.\n"
+					"Example \"\\unicode_codepoint(u1F604);\" for 😄.\n"
+					"Command at: " + command.name.begin.to_string()};
+
+			if (command.parameters.size() != 1 || !command.children.empty())
+				{
+				throw error;
+				}
+			const auto& parameter{command.parameters[0]};
+			text_parser::tokeniser<char_t> tokeniser{parameter.string()};
+			const typename text_parser::tokeniser<char_t>::codepoint_with_range first_codepoint{tokeniser.next_codepoint(tokeniser.begin_with_info())};
+			if (first_codepoint.codepoint != U'u')
+				{
+				throw error;
+				}
 			}
 		};
 	}

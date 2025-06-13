@@ -5,6 +5,7 @@
 
 namespace barnack::text_parser
 	{
+
 	template <typename char_t>
 	std::string tokeniser<char_t>::iterator_with_info::to_string() const noexcept
 		{
@@ -175,7 +176,172 @@ namespace barnack::text_parser
 		return range{first_half.begin, second_half.end};
 		}
 
-	template class tokeniser<char16_t>;
-	template class tokeniser<char8_t>;
-	template class tokeniser<char>;
+
+	template <typename char_t>
+	typename tokeniser<char_t>::range tokeniser<char_t>::next_string(const typename tokeniser<char_t>::iterator_with_info& begin) const noexcept
+		{
+		const codepoint_with_range first{next_codepoint(begin)};
+		if (first.codepoint != U'\"')
+			{
+			return range{begin, begin};
+			}
+
+		codepoint_with_range previous{first};
+		while (true)
+			{
+			if (previous.range.end.it == this->end())
+				{
+				return range{begin, previous.range.end};
+				}
+			codepoint_with_range current{next_codepoint(previous.range.end)};
+
+			if ((current.codepoint == U'\"') && (previous.codepoint != U'\\'))
+				{
+				return range{begin, current.range.end};
+				}
+
+			previous = current;
+			}
+		}
+
+
+
+	template <typename char_t>
+	bool tokeniser<char_t>::is_whitespace() const noexcept
+		{
+		const range range{this->next_whitespace(this->begin_with_info())};
+		const bool is_full_range{(range.begin.it == this->begin()) && (range.end.it == this->end())};
+		return is_full_range;
+		}
+	
+	template <typename char_t>
+	bool tokeniser<char_t>::is_identifier() const noexcept
+		{
+		const range range{this->next_identifier(this->begin_with_info())};
+		const bool is_full_range{(range.begin.it == this->begin()) && (range.end.it == this->end())};
+		return is_full_range;
+		}
+
+	template <typename char_t>
+	bool tokeniser<char_t>::is_number() const noexcept
+		{
+		const range range{this->next_number(this->begin_with_info())};
+		const bool is_full_range{(range.begin.it == this->begin()) && (range.end.it == this->end())};
+		return is_full_range;
+		}
+
+	template <typename char_t>
+	bool tokeniser<char_t>::is_string() const noexcept
+		{
+		const range range{this->next_string(this->begin_with_info())};
+		const bool is_full_range{(range.begin.it == this->begin()) && (range.end.it == this->end())};
+		return is_full_range;
+		}
+
+	template <typename char_t>
+	float tokeniser<char_t>::extract_number() const //TODO better function with less error, this was written in haste just to get the rest of the project going
+		{
+		if (!is_number()) 
+			{
+			throw std::runtime_error{"Error extracting number from tokeniser.\nTokeniser does not contain a number. Check with \"is_number\" before calling \"extract_number\""};
+			}
+
+		float ret{0.f};
+
+		codepoint_with_range cp{next_codepoint(begin_with_info())};
+		while (true)
+			{
+			if (cp.codepoint == U'.')
+				{
+				break;
+				}
+
+			const float digit{static_cast<float>(cp.codepoint - U'0')};
+			ret += digit;
+
+			if (cp.range.end.it == this->end())
+				{
+				return ret;
+				}
+
+			ret *= 10.f;
+			cp = next_codepoint(cp.range.end);
+			}
+		cp = next_codepoint(cp.range.end);
+
+		float fractional_digits_multiplier{.1f};
+		while (true)
+			{
+			const float digit{static_cast<float>(cp.codepoint - U'0')};
+			ret += digit * fractional_digits_multiplier;
+
+			if (cp.range.end.it == this->end())
+				{
+				break;
+				}
+
+			fractional_digits_multiplier *= .1f;
+			cp = next_codepoint(cp.range.end);
+			}
+		return ret;
+		}
+
+	template <typename char_t>
+	std::basic_string<char_t> tokeniser<char_t>::extract_string() const
+		{
+		if (!is_string())
+			{
+			throw std::runtime_error{"Error extracting string from tokeniser.\nTokeniser does not contain a string. Check with \"is_string\" before calling \"extract_string\""};
+			}
+
+		std::basic_string<char_t> ret;
+
+		codepoint_with_range cp{next_codepoint(next_codepoint(begin_with_info()).range.end)};
+		while (true)
+			{
+			if (cp.codepoint == U'\\')
+				{
+				codepoint_with_range after_backslash{next_codepoint(cp.range.end)};
+				if (after_backslash.codepoint == U'\\')
+					{
+					utf8::append(U'\\', std::back_inserter(ret));//TODO is this the right function?
+					}
+				else if (after_backslash.codepoint == U'\"')
+					{
+					utf8::append(U'\"', std::back_inserter(ret));
+					}
+				else if (after_backslash.codepoint == U't')
+					{
+					utf8::append(U'\t', std::back_inserter(ret));
+					}
+				else if (after_backslash.codepoint == U'n')
+					{
+					utf8::append(U'\n', std::back_inserter(ret));
+					}
+				else
+					{
+					throw std::runtime_error{"Error extracting string from tokeniser.\nInvalid escape sequence \"\\" + utils::string::cast<char>(after_backslash.range.string()) + "\""};
+					}
+				cp = next_codepoint(after_backslash.range.end);
+				}
+			else if (cp.codepoint == U'\"')
+				{
+				return ret;
+				}
+			else if (cp.range.end.it == this->end())
+				{
+				return ret;
+				}
+			else
+				{
+				utf8::append(cp.codepoint, std::back_inserter(ret));
+				cp = next_codepoint(cp.range.end);
+				}
+			}
+		}
+
+
+	template struct tokeniser<char16_t>;
+	template struct tokeniser<char8_t>;
+	template struct tokeniser<char>;
 	}

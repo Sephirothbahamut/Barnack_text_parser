@@ -66,7 +66,7 @@ namespace barnack::text_parser
 				}
 			void add_command(std::derived_from<command_definition::base<char_t>> auto& command)
 				{
-				commands_definitions.insert({view_t{command.name()}, std::reference_wrapper<command_definition::base<char>>{command}});
+				commands_definitions.insert({view_t{command.name()}, std::reference_wrapper<command_definition::base<char_t>>{command}});
 				}
 
 			void execute(const input_command_t& input_command);

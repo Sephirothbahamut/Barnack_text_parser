@@ -133,14 +133,21 @@ namespace barnack::text_parser
 			}
 		if (ret.empty())
 			{
+			ret = tokeniser.next_string(begin);
+			}
+		if (ret.empty())
+			{
 			throw std::runtime_error
 				{
-				"Invalid command parameter. Command parameters must be valid identifier or number\n"
+				"Invalid command parameter. Command parameters must be valid identifier, a string, or number\n"
 				"An identifier is a sequence of lower or upper case latin alphabet non-decorated letters, arabic numerals, and underscores.\n"
+				"A string is a sequence of characters enclosed in quotation marks. A backspace can be used to escape the quotation marks symbols and continue the string.\n"
 				"A number is a sequence of arabic numerals, with one or no dot as decimal separator.\n"
 				"Examples: \n"
 				"\tparam\n"
 				"\tparam_qwerty_456\n"
+				"\t\"string!\"\n"
+				"\t\"string with a \\\"quotation\\\" symbol inside\"\n"
 				"\t123456\n"
 				"\t123.456\n"
 				"\t.123\n"

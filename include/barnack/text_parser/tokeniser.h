@@ -87,6 +87,15 @@ namespace barnack::text_parser
 		range next_whitespace(const iterator_with_info& begin) const noexcept;
 		range next_identifier(const iterator_with_info& begin) const noexcept;
 		range next_number    (const iterator_with_info& begin) const noexcept;
+		range next_string    (const iterator_with_info& begin) const noexcept;
+		
+		bool is_whitespace() const noexcept;
+		bool is_identifier() const noexcept;
+		bool is_number    () const noexcept;
+		bool is_string    () const noexcept;
+
+		float extract_number() const;
+		std::basic_string<char_t> extract_string() const;
 		};
 	}
 
