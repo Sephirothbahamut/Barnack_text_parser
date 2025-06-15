@@ -18,11 +18,7 @@ namespace barnack::text_parser::command_definition
 		{
 		using char_t = typename base<CHAR_T>::char_t;
 
-		virtual std::basic_string_view<char_t> name() const noexcept final override
-			{
-			static std::basic_string<char_t> ret{utils::string::cast<char_t>("comment")}; //TODO constexpr once utf8 library becomes constexpr, if ever
-			return {ret};
-			}
+		virtual std::string name() const noexcept final override { return "comment"; }
 		};
 
 	template <typename CHAR_T, typename OUTPUT_CHAR_T>
@@ -32,12 +28,15 @@ namespace barnack::text_parser::command_definition
 		using output_char_t = OUTPUT_CHAR_T;
 		using output_string_t = std::basic_string<output_char_t>;
 
-		output_body_base(output_string_t& output_string) : output_string{output_string} {}
-		output_string_t& output_string;
+		utils::observer_ptr<output_string_t> output_string_ptr;
 
 		virtual void on_child(const typename tree_parser<char_t>::command& command, const typename tokeniser<char_t>::range& child_range) final override
 			{
-			output_string += utils::string::cast<output_char_t>(child_range.string());
+			if (output_string_ptr)
+				{
+				auto& output_string{*output_string_ptr};
+				output_string += utils::string::cast<output_char_t>(child_range.string());
+				}
 			}
 		};
 
@@ -47,9 +46,7 @@ namespace barnack::text_parser::command_definition
 		using char_t        = typename output_body_base<CHAR_T, OUTPUT_CHAR_T>::char_t;
 		using output_char_t = typename output_body_base<CHAR_T, OUTPUT_CHAR_T>::output_char_t;
 
-		using output_body_base<char_t, output_char_t>::output_body_base;
-
-		virtual std::basic_string_view<char_t> name() const noexcept final override { return {}; }
+		virtual std::string name() const noexcept final override { return {}; }
 
 		virtual void validate(const typename tree_parser<char_t>::command& command) const override 
 			{
@@ -68,19 +65,13 @@ namespace barnack::text_parser::command_definition
 		using char_t        = typename output_body_base<CHAR_T, OUTPUT_CHAR_T>::char_t;
 		using output_char_t = typename output_body_base<CHAR_T, OUTPUT_CHAR_T>::output_char_t;
 
-		using output_body_base<char_t, output_char_t>::output_body_base;
-
-		virtual std::basic_string_view<char_t> name() const noexcept final override
-			{
-			static std::basic_string<char_t> ret{utils::string::cast<char_t>("output_body")}; //TODO constexpr once utf8 library becomes constexpr, if ever
-			return ret;
-			}
+		virtual std::string name() const noexcept final override { return "output_body"; }
 
 		virtual void validate(const typename tree_parser<char_t>::command& command) const override
 			{
 			if (!command.parameters.empty())
 				{
-				throw std::runtime_error{"Error parsing root command\n"
+				throw std::runtime_error{"Error parsing output_body command\n"
 					"Expects no parameters.\n"
 					"Command at: " + command.name.begin.to_string()};
 				}
@@ -316,25 +307,22 @@ namespace barnack::text_parser::command_definition
 				}
 		};
 		
-	template <typename CHAR_T, typename OUTPUT_CHAR_T>
+	template <typename CHAR_T>
 	class runtime_defined_replacement : public base<CHAR_T>
 		{
 		public:
 			using char_t = typename base<CHAR_T>::char_t;
-			using output_char_t = OUTPUT_CHAR_T;
-			using output_string_t = std::basic_string<output_char_t>;
 		
 				
 			struct create_info
 				{
-				std::basic_string<char_t> name;
+				std::string name;
 				std::basic_string<char_t> replacement_string_before_body_prototype;
 				std::basic_string<char_t> replacement_string_after_body_prototype;
 				runtime_checked_parameters::parameters_type_variant parameters;
 				runtime_checked_parameters::body_requirement body;
 				};
-			runtime_defined_replacement(const create_info& create_info, output_string_t& output_string) : 
-				output_string{output_string},
+			runtime_defined_replacement(const create_info& create_info) : 
 				inner_name{create_info.name},
 				runtime_checked_parameters{create_info.parameters, create_info.body},
 				replacement_piece_before_body{utils::string::cast<char>(create_info.name), create_info.replacement_string_before_body_prototype},
@@ -348,13 +336,13 @@ namespace barnack::text_parser::command_definition
 					const auto& exact_parameters{std::get<runtime_checked_parameters::parameters_type::exact>(runtime_checked_parameters.parameters)};
 					if (exact_parameters.size() < replacement_piece_before_body.replacement_string_parameters_count)
 						{
-						throw std::runtime_error{"Error validating command \"" + utils::string::cast<char>(inner_name) + "\"\n"
+						throw std::runtime_error{"Error validating command \"" + inner_name + "\"\n"
 							"Explicit parameters requirement expects " + std::to_string(exact_parameters.size()) + " parameters,\n"
 							"Replacement string before body prototype has " + std::to_string(replacement_piece_before_body.replacement_string_parameters_count) + " parameters instead."};
 						}
 					if (exact_parameters.size() < replacement_piece_after_body.replacement_string_parameters_count)
 						{
-						throw std::runtime_error{"Error validating command \"" + utils::string::cast<char>(inner_name) + "\"\n"
+						throw std::runtime_error{"Error validating command \"" + inner_name + "\"\n"
 							"Explicit parameters requirement expects " + std::to_string(exact_parameters.size()) + " parameters,\n"
 							"Replacement string after body prototype has " + std::to_string(replacement_piece_after_body.replacement_string_parameters_count) + " parameters instead."};
 						}
@@ -363,21 +351,20 @@ namespace barnack::text_parser::command_definition
 					{
 					if (replacement_piece_before_body.replacement_string_parameters_count > 0)
 						{
-						throw std::runtime_error{"Error validating command \"" + utils::string::cast<char>(inner_name) + "\"\n"
+						throw std::runtime_error{"Error validating command \"" + inner_name + "\"\n"
 							"Explicit parameters requirement expects no parameters,\n"
 							"Replacement string before body prototype has " + std::to_string(replacement_piece_before_body.replacement_string_parameters_count) + " parameters instead."};
 						}
 					if (replacement_piece_after_body.replacement_string_parameters_count > 0)
 						{
-						throw std::runtime_error{"Error validating command \"" + utils::string::cast<char>(inner_name) + "\"\n"
+						throw std::runtime_error{"Error validating command \"" + inner_name + "\"\n"
 							"Explicit parameters requirement expects no parameters,\n"
 							"Replacement string after body prototype has " + std::to_string(replacement_piece_after_body.replacement_string_parameters_count) + " parameters instead."};
 						}
 					}
 				}
 		private:
-			output_string_t& output_string;
-			std::basic_string<char_t> inner_name;
+			std::string inner_name;
 			runtime_checked_parameters runtime_checked_parameters;
 			replacement_piece<char_t> replacement_piece_before_body;
 			replacement_piece<char_t> replacement_piece_after_body;
@@ -385,16 +372,16 @@ namespace barnack::text_parser::command_definition
 		public:
 			utils::observer_ptr<commands_executor<char_t>> commands_executor_ptr{nullptr};
 		
-			virtual std::basic_string_view<char_t> name() const noexcept final override
+			virtual std::string name() const noexcept final override
 				{
 				return inner_name;
 				}
 
 			virtual void validate(const typename tree_parser<char_t>::command& command) const override
 				{
-				runtime_checked_parameters   .validate<char_t>(utils::string::cast<char>(inner_name), command);
-				replacement_piece_before_body.validate        (utils::string::cast<char>(inner_name), command);
-				replacement_piece_after_body .validate        (utils::string::cast<char>(inner_name), command);
+				runtime_checked_parameters   .validate<char_t>(inner_name, command);
+				replacement_piece_before_body.validate        (inner_name, command);
+				replacement_piece_after_body .validate        (inner_name, command);
 				}
 			virtual bool execute_child_commands() const noexcept override { return false; }
 			
@@ -423,7 +410,7 @@ namespace barnack::text_parser::command_definition
 					}
 				catch (const std::exception& e)
 					{
-					throw std::runtime_error{"Error parsing command \"" + utils::string::cast<char>(inner_name) + "\"\n"
+					throw std::runtime_error{"Error parsing command \"" + inner_name + "\"\n"
 						"Command at: " + command.name.begin.to_string() + "\n"
 						"Errors parsing the generated string.\n" + e.what()};
 					}
@@ -443,27 +430,30 @@ namespace barnack::text_parser::command_definition
 
 		using output_body_base<CHAR_T, OUTPUT_CHAR_T>::output_string;
 
-		region_properties(output_string_t& output_string, regions_t& output_region) :
-			output_body_base<CHAR_T, OUTPUT_CHAR_T>{output_string},
-			output_region{output_region}
-			{}
-
-		regions_t& output_region;
+		utils::observer_ptr<regions_t>& output_region_ptr;
 		regions_value_type previous_value;
 
 		virtual regions_value_type region_value(const typename tree_parser<char_t>::command& command) = 0;
 	
 		virtual void on_begin(const typename tree_parser<char_t>::command& command) final override
 			{
-			const auto last_slot = output_region.at_element_index(output_string.size());
-			previous_value = last_slot.value();
-	
-			output_region.add(region_value(command), utils::containers::region::create::from(output_string.size()));
+			if (output_region_ptr)
+				{
+				auto& output_region{*output_region_ptr};
+				const auto last_slot = output_region.at_element_index(output_string.size());
+				previous_value = last_slot.value();
+
+				output_region.add(region_value(command), utils::containers::region::create::from(output_string.size()));
+				}
 			}
 	
 		virtual void on_end(const typename tree_parser<char_t>::command& command) final override
 			{
-			output_region.add(previous_value, utils::containers::region::create::from(output_string.size()));
+			if (output_region_ptr)
+				{
+				auto& output_region{*output_region_ptr};
+				output_region.add(previous_value, utils::containers::region::create::from(output_string.size()));
+				}
 			}
 		};
 
@@ -477,11 +467,10 @@ namespace barnack::text_parser::command_definition
 	struct unicode_codepoint : base<CHAR_T>
 		{
 		using char_t = typename base<CHAR_T>::char_t;
-		using output_char_t = OUTPUT_CHAR_T;
+		using output_char_t   = OUTPUT_CHAR_T;
 		using output_string_t = std::basic_string<output_char_t>;
 
-		unicode_codepoint(output_string_t& output_string) : output_string{output_string} {}
-		output_string_t& output_string;
+		utils::observer_ptr<output_string_t> output_string_ptr;
 
 		virtual std::basic_string_view<char_t> name() const noexcept final override
 			{
@@ -496,7 +485,11 @@ namespace barnack::text_parser::command_definition
 			const char32_t codepoint{utils::string::parse_codepoint(hex_number_string)};
 			const std::basic_string<output_char_t> codepoint_as_string{utils::string::codepoint_to_string<output_char_t>(codepoint)};
 			
-			output_string += codepoint_as_string;
+			if (output_string_ptr)
+				{
+				auto& output_string{*output_string_ptr};
+				output_string += codepoint_as_string;
+				}
 			}
 
 		virtual void validate(const typename tree_parser<char_t>::command& command) const override

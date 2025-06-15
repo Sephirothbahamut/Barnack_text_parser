@@ -5,7 +5,8 @@ namespace barnack::text_parser
 	template <typename char_t>
 	void commands_executor<char_t>::execute(const input_command_t& input_command)
 		{
-		auto command_definition_it{commands_definitions.find(input_command.name.string())};
+		const std::string input_command_name_utf8{utils::string::cast<char>(input_command.name.string())};
+		auto command_definition_it{commands_definitions.find(input_command_name_utf8)};
 		if (command_definition_it == commands_definitions.end())
 			{
 			throw std::runtime_error{"Error resolving command \"" + utils::string::cast<char>(input_command.name.string()) + "\"\n"
