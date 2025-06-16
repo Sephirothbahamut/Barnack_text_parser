@@ -28,7 +28,7 @@ namespace barnack::text_parser::command_definition
 		using output_char_t = OUTPUT_CHAR_T;
 		using output_string_t = std::basic_string<output_char_t>;
 
-		utils::observer_ptr<output_string_t> output_string_ptr;
+		utils::observer_ptr<output_string_t> output_string_ptr{nullptr};
 
 		virtual void on_child(const typename tree_parser<char_t>::command& command, const typename tokeniser<char_t>::range& child_range) final override
 			{
@@ -191,7 +191,7 @@ namespace barnack::text_parser::command_definition
 			if (body == body_requirement::optional)
 				{
 				}
-			else if (body == body_requirement::required)
+			else if (body == body_requirement::required && command.children.empty())
 				{
 				throw std::runtime_error{"Error parsing command \"" + command_prototype_name + "\"\n"
 					"Expects body.\n"
@@ -428,18 +428,19 @@ namespace barnack::text_parser::command_definition
 		using regions_value_type = REGIONS_VALUE_TYPE;
 		using regions_t = utils::containers::regions<regions_value_type>;
 
-		using output_body_base<CHAR_T, OUTPUT_CHAR_T>::output_string;
+		using output_body_base<CHAR_T, OUTPUT_CHAR_T>::output_string_ptr;
 
-		utils::observer_ptr<regions_t>& output_region_ptr;
+		utils::observer_ptr<regions_t> output_region_ptr{nullptr};
 		regions_value_type previous_value;
 
 		virtual regions_value_type region_value(const typename tree_parser<char_t>::command& command) = 0;
 	
 		virtual void on_begin(const typename tree_parser<char_t>::command& command) final override
 			{
-			if (output_region_ptr)
+			if (output_region_ptr && output_string_ptr)
 				{
 				auto& output_region{*output_region_ptr};
+				auto& output_string{*output_string_ptr};
 				const auto last_slot = output_region.at_element_index(output_string.size());
 				previous_value = last_slot.value();
 
@@ -449,8 +450,9 @@ namespace barnack::text_parser::command_definition
 	
 		virtual void on_end(const typename tree_parser<char_t>::command& command) final override
 			{
-			if (output_region_ptr)
+			if (output_region_ptr && output_string_ptr)
 				{
+				auto& output_string{*output_string_ptr};
 				auto& output_region{*output_region_ptr};
 				output_region.add(previous_value, utils::containers::region::create::from(output_string.size()));
 				}
@@ -470,13 +472,9 @@ namespace barnack::text_parser::command_definition
 		using output_char_t   = OUTPUT_CHAR_T;
 		using output_string_t = std::basic_string<output_char_t>;
 
-		utils::observer_ptr<output_string_t> output_string_ptr;
+		utils::observer_ptr<output_string_t> output_string_ptr{nullptr};
 
-		virtual std::basic_string_view<char_t> name() const noexcept final override
-			{
-			static std::basic_string<char_t> ret{utils::string::cast<char_t>("unicode_codepoint")}; //TODO constexpr once utf8 library becomes constexpr, if ever
-			return ret;
-			}
+		virtual std::string name() const noexcept final override { return "unicode_codepoint"; }
 
 		virtual void on_begin(const typename tree_parser<char_t>::command& command) final override
 			{

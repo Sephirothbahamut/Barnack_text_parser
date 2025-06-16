@@ -255,6 +255,10 @@ namespace barnack::text_parser
 				{
 				break;
 				}
+			else
+				{
+				ret *= 10.f;
+				}
 
 			const float digit{static_cast<float>(cp.codepoint - U'0')};
 			ret += digit;
@@ -263,8 +267,6 @@ namespace barnack::text_parser
 				{
 				return ret;
 				}
-
-			ret *= 10.f;
 			cp = next_codepoint(cp.range.end);
 			}
 		cp = next_codepoint(cp.range.end);
